@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "import-data": "tsx scripts/import-data.ts"
+    "import-data": "tsx scripts/import-data.ts",
+    "import-anomalies": "tsx scripts/import-anomalies.ts",
+    "import-all": "npm run import-data && npm run import-anomalies"
   },
   "dependencies": {
     "@types/d3": "^7.4.3",
