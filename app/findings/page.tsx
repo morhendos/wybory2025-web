@@ -1,8 +1,72 @@
 'use client'
 
 import { motion } from 'framer-motion'
+import { useEffect, useState } from 'react'
+import { GAMCurve } from '@/components/charts/GAMCurve'
+import { ScatterPlot } from '@/components/charts/ScatterPlot'
+import { RegionalBarChart } from '@/components/charts/RegionalBarChart'
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
+
+interface Summary {
+  totalCommissions: number
+  totalAnomalies: number
+  summary: {
+    totalEffect: number
+    avgAnomaly: number
+    maxAnomaly: number
+    affectedCommissions: number
+  }
+  topRegions: Array<{
+    _id: string
+    totalAnomalies: number
+    count: number
+  }>
+}
 
 export default function FindingsPage() {
+  const [summary, setSummary] = useState<Summary | null>(null)
+  const [gamData, setGamData] = useState<any[]>([])
+  const [scatterData, setScatterData] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch summary data
+        const summaryRes = await fetch('/api/summary')
+        const summaryData = await summaryRes.json()
+        setSummary(summaryData)
+
+        // Fetch GAM curve data
+        const gamRes = await fetch('/api/anomalies/gam-curve')
+        const gamCurveData = await gamRes.json()
+        setGamData(gamCurveData.data || [])
+
+        // Fetch scatter plot data (sample of anomalies)
+        const scatterRes = await fetch('/api/anomalies?limit=500')
+        const scatterPlotData = await scatterRes.json()
+        setScatterData(scatterPlotData.data || [])
+      } catch (error) {
+        console.error('Error fetching data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <LoadingSpinner />
+      </div>
+    )
+  }
+
+  const totalEffect = summary?.summary?.totalEffect || -462850
+  const affectedCommissions = summary?.summary?.affectedCommissions || 0
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <motion.div
@@ -33,14 +97,17 @@ export default function FindingsPage() {
             </div>
             <div className="ml-4">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                -462,850 głosów
+                {Math.round(totalEffect).toLocaleString('pl-PL')} głosów
               </h2>
               <p className="text-lg text-gray-600 mb-4">
                 Całkowity oszacowany efekt anomalii dla Rafała Trzaskowskiego
               </p>
               <div className="bg-gray-50 rounded-lg p-4">
                 <p className="text-sm text-gray-700">
-                  <strong>Przedział ufności (95%):</strong> od -520,000 do -405,000 głosów
+                  <strong>Dotkniętych komisji:</strong> {affectedCommissions.toLocaleString('pl-PL')}
+                </p>
+                <p className="text-sm text-gray-700 mt-2">
+                  <strong>Średnia anomalia:</strong> {Math.round(summary?.summary?.avgAnomaly || 0)} głosów na komisję
                 </p>
                 <p className="text-sm text-gray-700 mt-2">
                   Analiza wykazała, że niewyjaśnione straty głosów występowały niemal wyłącznie
@@ -60,19 +127,78 @@ export default function FindingsPage() {
           <h2 className="text-xl font-bold text-gray-900 mb-4">
             Wzorzec anomalii według typu komisji
           </h2>
-          <div className="bg-gray-100 rounded-lg h-64 flex items-center justify-center mb-4">
-            <p className="text-gray-500">Wykres GAM - wkrótce</p>
-          </div>
-          <p className="text-gray-600">
+          <p className="text-gray-600 mb-4">
             Krzywa GAM pokazuje wyraźną zależność: im bardziej komisja była "przeciwna" RT
             (niższy leaning score), tym większe były niewyjaśnione straty głosów.
           </p>
+          {gamData.length > 0 ? (
+            <GAMCurve data={gamData} />
+          ) : (
+            <div className="bg-gray-100 rounded-lg h-64 flex items-center justify-center">
+              <p className="text-gray-500">Brak danych do wyświetlenia</p>
+            </div>
+          )}
         </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
+          className="card"
+        >
+          <h2 className="text-xl font-bold text-gray-900 mb-4">
+            Rozkład anomalii w poszczególnych komisjach
+          </h2>
+          <p className="text-gray-600 mb-4">
+            Każdy punkt reprezentuje jedną komisję wyborczą. Czerwone punkty to komisje z największymi anomaliami.
+          </p>
+          {scatterData.length > 0 ? (
+            <ScatterPlot 
+              data={scatterData.map(d => ({
+                leaningScore: d.leaningScore || 0,
+                anomalyInVotes: d.anomalyInVotes || 0,
+                voivodeship: d.metadata?.voivodeship || d.commissionDetails?.voivodeship,
+                county: d.metadata?.county || d.commissionDetails?.county
+              }))}
+            />
+          ) : (
+            <div className="bg-gray-100 rounded-lg h-64 flex items-center justify-center">
+              <p className="text-gray-500">Brak danych do wyświetlenia</p>
+            </div>
+          )}
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="card"
+        >
+          <h2 className="text-xl font-bold text-gray-900 mb-4">
+            Anomalie według województw
+          </h2>
+          <p className="text-gray-600 mb-4">
+            Całkowita suma anomalii w poszczególnych województwach.
+          </p>
+          {summary?.topRegions && summary.topRegions.length > 0 ? (
+            <RegionalBarChart 
+              data={summary.topRegions.map(r => ({
+                region: r._id,
+                totalAnomaly: r.totalAnomalies,
+                commissionsAffected: r.count
+              }))}
+            />
+          ) : (
+            <div className="bg-gray-100 rounded-lg h-64 flex items-center justify-center">
+              <p className="text-gray-500">Brak danych do wyświetlenia</p>
+            </div>
+          )}
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
           className="grid md:grid-cols-2 gap-6"
         >
           <div className="card">
@@ -119,7 +245,7 @@ export default function FindingsPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
+          transition={{ delay: 0.6 }}
           className="card bg-yellow-50 border-yellow-200"
         >
           <h3 className="text-lg font-bold text-yellow-900 mb-2">
