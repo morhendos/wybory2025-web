@@ -15,6 +15,8 @@ interface Summary {
     avgAnomaly: number
     maxAnomaly: number
     affectedCommissions: number
+    significantAnomalies?: number
+    avgSignificantAnomaly?: number
   }
   topRegions: Array<{
     _id: string
@@ -104,10 +106,13 @@ export default function FindingsPage() {
               </p>
               <div className="bg-gray-50 rounded-lg p-4">
                 <p className="text-sm text-gray-700">
-                  <strong>Dotkniętych komisji:</strong> {affectedCommissions.toLocaleString('pl-PL')}
+                  <strong>Komisji z anomaliami:</strong> {affectedCommissions.toLocaleString('pl-PL')} z {summary?.totalCommissions?.toLocaleString('pl-PL') || '32,143'}
                 </p>
                 <p className="text-sm text-gray-700 mt-2">
-                  <strong>Średnia anomalia:</strong> {Math.round(summary?.summary?.avgAnomaly || 0)} głosów na komisję
+                  <strong>Średnia anomalia:</strong> {Math.round(summary?.summary?.avgSignificantAnomaly || summary?.summary?.avgAnomaly || 0)} głosów na komisję z anomalią
+                </p>
+                <p className="text-sm text-gray-700 mt-2">
+                  <strong>Znaczące anomalie:</strong> {(summary?.summary?.significantAnomalies || 0).toLocaleString('pl-PL')} komisji (&gt;10 głosów)
                 </p>
                 <p className="text-sm text-gray-700 mt-2">
                   Analiza wykazała, że niewyjaśnione straty głosów występowały niemal wyłącznie
@@ -128,7 +133,7 @@ export default function FindingsPage() {
             Wzorzec anomalii według typu komisji
           </h2>
           <p className="text-gray-600 mb-4">
-            Krzywa GAM pokazuje wyraźną zależność: im bardziej komisja była "przeciwna" RT
+            Krzywa GAM pokazuje wyraźną zależność: im bardziej komisja była &quot;przeciwna&quot; RT
             (niższy leaning score), tym większe były niewyjaśnione straty głosów.
           </p>
           {gamData.length > 0 ? (
@@ -155,7 +160,7 @@ export default function FindingsPage() {
           {scatterData.length > 0 ? (
             <ScatterPlot 
               data={scatterData.map(d => ({
-                leaningScore: d.leaningScore || 0,
+                leaningScore: d.commissionDetails?.leaningScore || d.leaningScore || 0,
                 anomalyInVotes: d.anomalyInVotes || 0,
                 voivodeship: d.metadata?.voivodeship || d.commissionDetails?.voivodeship,
                 county: d.metadata?.county || d.commissionDetails?.county

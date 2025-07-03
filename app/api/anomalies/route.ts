@@ -11,25 +11,45 @@ export async function GET(request: NextRequest) {
     const order = searchParams.get('order') === 'asc' ? 1 : -1
     const limit = parseInt(searchParams.get('limit') || '100')
     const skip = parseInt(searchParams.get('skip') || '0')
+    const excludeOverseas = searchParams.get('excludeOverseas') === 'true'
 
     const db = await getDatabase()
     
     // Build aggregation pipeline
     const pipeline: any[] = [
-      // Join with commissions collection
+      // Join with commissions collection using metadata fields
       {
         $lookup: {
           from: 'commissions',
-          localField: 'commissionId',
-          foreignField: '_id',
+          let: { 
+            voivodeship: '$metadata.voivodeship', 
+            county: '$metadata.county',
+            commune: '$metadata.commune',
+            commissionNumber: '$metadata.commissionNumber'
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$voivodeship', '$$voivodeship'] },
+                    { $eq: ['$county', '$$county'] },
+                    { $eq: ['$commune', '$$commune'] },
+                    { $eq: ['$commissionNumber', '$$commissionNumber'] }
+                  ]
+                }
+              }
+            }
+          ],
           as: 'commissionDetails'
         }
       },
-      { $unwind: '$commissionDetails' },
+      { $unwind: { path: '$commissionDetails', preserveNullAndEmptyArrays: true } },
       // Filter
       {
         $match: {
-          ...(voivodeship && { 'commissionDetails.voivodeship': voivodeship }),
+          ...(voivodeship && { 'metadata.voivodeship': voivodeship }),
+          ...(excludeOverseas && { 'metadata.voivodeship': { $ne: null, $exists: true } }),
           anomalyInVotes: { $lte: -minAnomaly }
         }
       },

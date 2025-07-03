@@ -174,9 +174,24 @@ async function generateMockAnomalies(db: any) {
   
   // Create a few extreme cases to make it interesting
   const extremeCases = [
-    { ...mockAnomalies[0], anomalyInVotes: -450, metadata: { ...mockAnomalies[0].metadata, voivodeship: 'Mazowieckie' } },
-    { ...mockAnomalies[1], anomalyInVotes: -380, metadata: { ...mockAnomalies[1].metadata, voivodeship: 'Małopolskie' } },
-    { ...mockAnomalies[2], anomalyInVotes: -320, metadata: { ...mockAnomalies[2].metadata, voivodeship: 'Wielkopolskie' } },
+    {
+      commissionId: `Mazowieckie_extreme_case_1`,
+      residual: -4.5, anomalyInVotes: -450, GAMPrediction: -450, leaningScore: 0.2,
+      confidenceInterval: { lower: -460, upper: -440 },
+      metadata: { voivodeship: 'Mazowieckie', county: 'Warsaw', commune: 'Center', commissionNumber: 999 }
+    },
+    {
+      commissionId: `Małopolskie_extreme_case_2`,
+      residual: -3.8, anomalyInVotes: -380, GAMPrediction: -380, leaningScore: 0.25,
+      confidenceInterval: { lower: -390, upper: -370 },
+      metadata: { voivodeship: 'Małopolskie', county: 'Krakow', commune: 'Center', commissionNumber: 998 }
+    },
+    {
+      commissionId: `Wielkopolskie_extreme_case_3`,
+      residual: -3.2, anomalyInVotes: -320, GAMPrediction: -320, leaningScore: 0.28,
+      confidenceInterval: { lower: -330, upper: -310 },
+      metadata: { voivodeship: 'Wielkopolskie', county: 'Poznan', commune: 'Center', commissionNumber: 997 }
+    }
   ]
   await db.collection('anomalies').insertMany(extremeCases)
 }

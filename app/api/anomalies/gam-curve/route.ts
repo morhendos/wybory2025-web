@@ -10,20 +10,22 @@ export async function GET(request: NextRequest) {
     // For now, we'll aggregate data to approximate the curve
     
     const pipeline = [
-      // Group by leaning score buckets
+      // Use all data, including zero leaning scores
+      { $match: { leaningScore: { $exists: true, $ne: null } } },
+      // Group by leaning score buckets (expanded range)
       {
         $bucket: {
           groupBy: '$leaningScore',
           boundaries: [
-            0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0
+            -1.0, -0.5, 0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0
           ],
           default: 'other',
           output: {
             avgResidual: { $avg: '$residual' },
-            avgGAMPrediction: { $avg: '$GAMPrediction' },
+            avgGAMPrediction: { $avg: '$anomalyInVotes' }, // Use actual anomaly data
             avgAnomaly: { $avg: '$anomalyInVotes' },
             count: { $sum: 1 },
-            stdDev: { $stdDevPop: '$residual' }
+            stdDev: { $stdDevPop: '$anomalyInVotes' } // Use anomaly for std dev
           }
         }
       },
@@ -31,7 +33,7 @@ export async function GET(request: NextRequest) {
       {
         $project: {
           leaningScore: { $add: ['$_id', 0.05] }, // Center of bucket
-          residual: '$avgResidual',
+          residual: '$avgAnomaly', // Use avgAnomaly as residual for display
           GAMPrediction: '$avgGAMPrediction',
           count: 1,
           confidenceInterval: {

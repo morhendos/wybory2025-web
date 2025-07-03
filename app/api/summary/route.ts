@@ -16,26 +16,40 @@ export async function GET(request: NextRequest) {
             totalEffect: { $sum: '$anomalyInVotes' },
             avgAnomaly: { $avg: '$anomalyInVotes' },
             maxAnomaly: { $min: '$anomalyInVotes' }, // Min because negative values
-            affectedCommissions: { $sum: 1 }
+            affectedCommissions: { 
+              $sum: { 
+                $cond: [{ $ne: ['$anomalyInVotes', 0] }, 1, 0] 
+              } 
+            },
+            significantAnomalies: {
+              $sum: { 
+                $cond: [{ $or: [{ $lt: ['$anomalyInVotes', -10] }, { $gt: ['$anomalyInVotes', 10] }] }, 1, 0] 
+              } 
+            },
+            avgSignificantAnomaly: {
+              $avg: {
+                $cond: [
+                  { $ne: ['$anomalyInVotes', 0] },
+                  '$anomalyInVotes',
+                  null
+                ]
+              }
+            }
           }
         }
       ]).toArray()
     ])
 
-    // Get anomalies by voivodeship
+    // Get anomalies by voivodeship using metadata
     const anomaliesByRegion = await db.collection('anomalies').aggregate([
       {
-        $lookup: {
-          from: 'commissions',
-          localField: 'commissionId',
-          foreignField: '_id',
-          as: 'commission'
+        $match: {
+          'metadata.voivodeship': { $ne: null, $exists: true }
         }
       },
-      { $unwind: '$commission' },
       {
         $group: {
-          _id: '$commission.voivodeship',
+          _id: '$metadata.voivodeship',
           totalAnomalies: { $sum: '$anomalyInVotes' },
           count: { $sum: 1 }
         }
@@ -51,7 +65,9 @@ export async function GET(request: NextRequest) {
         totalEffect: 0,
         avgAnomaly: 0,
         maxAnomaly: 0,
-        affectedCommissions: 0
+        affectedCommissions: 0,
+        significantAnomalies: 0,
+        avgSignificantAnomaly: 0
       },
       topRegions: anomaliesByRegion
     })

@@ -10,6 +10,7 @@ export default function ExplorePage() {
   const [anomalies, setAnomalies] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [summary, setSummary] = useState<any>(null)
+  const [excludeOverseas, setExcludeOverseas] = useState(true)
 
   // Placeholder - will be replaced with actual data from MongoDB
   const voivodeships = [
@@ -49,7 +50,8 @@ export default function ExplorePage() {
           minAnomaly: minAnomaly.toString(),
           limit: '100',
           sortBy: 'anomalyInVotes',
-          order: 'asc'
+          order: 'asc',
+          ...(excludeOverseas && { excludeOverseas: 'true' })
         })
         
         const response = await fetch(`/api/anomalies?${params}`)
@@ -63,7 +65,7 @@ export default function ExplorePage() {
     }
 
     fetchAnomalies()
-  }, [selectedVoivodeship, minAnomaly])
+  }, [selectedVoivodeship, minAnomaly, excludeOverseas])
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -117,6 +119,20 @@ export default function ExplorePage() {
                 <div className="text-sm text-gray-600 mt-1">
                   Co najmniej {minAnomaly} głosów
                 </div>
+              </div>
+
+              <div>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={excludeOverseas}
+                    onChange={(e) => setExcludeOverseas(e.target.checked)}
+                    className="rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">
+                    Tylko komisje krajowe
+                  </span>
+                </label>
               </div>
             </div>
           </div>
@@ -215,7 +231,7 @@ export default function ExplorePage() {
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {(anomaly.leaningScore || 0).toFixed(2)}
+                            {(anomaly.commissionDetails?.leaningScore || anomaly.leaningScore || 0).toFixed(2)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
                             <span className={`px-2 py-1 text-xs rounded-full ${
